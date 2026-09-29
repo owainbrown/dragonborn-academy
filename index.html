@@ -92,6 +92,20 @@ button:focus-visible,input:focus-visible,.cell:focus-visible{outline:3px solid v
 .choice.prime:hover:not(:disabled){background:#2f2a42}
 .choice.notprime{background:#2a1c1d;border-color:var(--ember);color:var(--flame)}
 .choice.notprime:hover:not(:disabled){background:#35211f}
+.progress{display:flex;align-items:center;gap:12px}
+.progress span{font-weight:700;font-size:.95rem;color:var(--bone);white-space:nowrap;font-variant-numeric:tabular-nums}
+.bar{flex:1;height:10px;border-radius:99px;background:var(--stone);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ember),var(--flame));transition:width .4s}
+.round-end{border:2px solid var(--gold);border-radius:14px;background:var(--stone-3);padding:20px;display:flex;flex-direction:column;gap:14px;text-align:center;align-items:center}
+.round-end h3{margin:0;font-family:var(--display);font-size:1.7rem;color:var(--gold)}
+.round-end .score{font-size:3rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.round-end .score small{font-size:1.2rem;color:var(--ink-dim)}
+.round-end p{margin:0}
+.round-end h4{margin:0 0 6px;font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-dim)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.chip{min-width:2.6em;padding:4px 10px;border-radius:8px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--stone);border:1px solid var(--line)}
+.chip.gemchip{background:var(--gemc);color:#15131c;border:none}
+.chip.practise{border-color:var(--miss);color:var(--miss)}
 .feedback{margin:0;min-height:1.6em;text-align:center;font-weight:700}
 .feedback.good{color:var(--good)}
 
@@ -172,6 +186,7 @@ button:focus-visible,input:focus-visible,.cell:focus-visible{outline:3px solid v
 
   <main class="board">
     <section class="panel encounter" aria-label="Encounter">
+      <div class="progress"><span id="round-label">Question 1 of 20</span><div class="bar" aria-hidden="true"><i id="round-bar"></i></div></div>
       <p class="flavour" id="flavour">A stone door bears a number.</p>
       <div class="arena">
         <div class="hero" id="hero">
@@ -206,6 +221,7 @@ button:focus-visible,input:focus-visible,.cell:focus-visible{outline:3px solid v
       <p class="feedback" id="feedback" aria-live="polite"></p>
 
       <div class="explain" id="explain" hidden aria-live="polite"></div>
+      <div class="round-end" id="round-end" hidden aria-live="polite"></div>
 
       <div class="spellbook">
         <h3>Spellbook</h3>
@@ -259,8 +275,39 @@ const FLAVOUR = [
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const KEY = 'prime-hoard-v1';
 
-let S = { name:'', gems:[], scorched:[], best:0, sound:true };
+let S = { name:'', gems:[], scorched:[], best:0, sound:true, rounds:0 };
 let streak = 0, turn = 0, recent = [], missQ = [], current = null, busy = false, mode = 'ask';
+const ROUND = 20;
+let R = { q:0, right:0, newGems:[], missed:[] };
+function renderProgress(){
+  const asking = Math.min(R.q + 1, ROUND);
+  $('round-label').textContent = R.q >= ROUND ? `${ROUND} of ${ROUND}` : `Question ${asking} of ${ROUND}`;
+  $('round-bar').style.width = (R.q / ROUND * 100) + '%';
+}
+function advance(){ if(R.q >= ROUND) showRoundEnd(); else next(); }
+function showRoundEnd(){
+  mode = 'end'; busy = false;
+  S.rounds = (S.rounds||0) + 1; save();
+  const verdict = R.right===ROUND ? 'A perfect round!' : R.right>=16 ? 'Mighty fire-breathing!' : R.right>=12 ? 'Good work, hero.' : 'Every hero starts somewhere. Keep practising.';
+  const gems = R.newGems.length
+    ? `<div><h4>New gems</h4><div class="chips">${R.newGems.map(n=>`<span class="chip gemchip" style="--gemc:${gemColour(n)}">${n}</span>`).join('')}</div></div>` : '';
+  const miss = R.missed.length
+    ? `<div><h4>Numbers to practise</h4><div class="chips">${R.missed.map(n=>`<span class="chip practise">${n}</span>`).join('')}</div><p style="margin-top:6px;font-size:.92rem;color:var(--ink-dim)">These will come back early next round.</p></div>` : '';
+  const el = $('round-end');
+  el.innerHTML = `<h3>Round ${S.rounds} complete!</h3>
+    <div class="score">${R.right}<small> out of ${ROUND}</small></div>
+    <p>${verdict}</p>${gems}${miss}
+    <button class="btn" id="next-round" type="button">Start next round</button>`;
+  el.hidden = false; $('ask').hidden = true; $('explain').hidden = true;
+  $('feedback').textContent = '';
+  renderProgress();
+  $('next-round').addEventListener('click', ()=>{
+    missQ.forEach(m=>{ m.due = turn; });
+    R = { q:0, right:0, newGems:[], missed:[] };
+    el.hidden = true; next();
+  });
+  el.scrollIntoView({behavior: reduceMotion() ? 'auto' : 'smooth', block:'nearest'});
+}
 
 function load(){ try{ const raw = localStorage.getItem(KEY); if(raw) Object.assign(S, JSON.parse(raw)); }catch(e){} }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
@@ -391,7 +438,7 @@ function ask(n){
   $('flavour').textContent = FLAVOUR[Math.floor(Math.random()*FLAVOUR.length)];
   $('feedback').textContent = ''; $('feedback').className = 'feedback';
   $('explain').hidden = true; $('ask').hidden = false;
-  setButtons(true);
+  setButtons(true); renderProgress();
 }
 function next(){ ask(pick()); }
 function setButtons(on){ $('btn-prime').disabled = !on; $('btn-not').disabled = !on; }
@@ -400,14 +447,16 @@ function setButtons(on){ $('btn-prime').disabled = !on; $('btn-not').disabled = 
 function answer(saidPrime){
   if(busy || mode!=='ask' || current==null) return;
   const n = current, prime = isPrime(n), right = saidPrime===prime;
-  turn++;
+  turn++; R.q++;
+  if(right) R.right++; else if(!R.missed.includes(n)) R.missed.push(n);
+  renderProgress();
   if(right){
     busy = true; setButtons(false);
     streak++; if(streak>S.best) S.best = streak;
     missQ = missQ.filter(m=>m.n!==n);
     let msg, isNew = false;
     if(prime){
-      isNew = !S.gems.includes(n); if(isNew) S.gems.push(n);
+      isNew = !S.gems.includes(n); if(isNew){ S.gems.push(n); R.newGems.push(n); }
       msg = isNew ? `${heroName()} claims the ${n} gem! Fire can't split it.` : `Right! ${n} is prime. That gem is already in the hoard.`;
       if(S.gems.length===25 && isNew) msg = `The last gem! ${heroName()}'s hoard is complete!`;
     } else {
@@ -432,7 +481,7 @@ function answer(saidPrime){
       renderHoard(isNew || !prime ? n : null); renderStats();
       bump($('streak')); if(isNew) bump($('gem-count'));
     });
-    setTimeout(next, reduceMotion() ? 1700 : 2300);
+    setTimeout(advance, reduceMotion() ? 1700 : 2300);
   } else {
     streak = 0;
     missQ = missQ.filter(m=>m.n!==n); missQ.push({n, due: turn+3});
@@ -450,13 +499,13 @@ function showExplain(n, context){
   ex.innerHTML = explainHTML(n, context);
   ex.hidden = false; $('ask').hidden = true;
   $('got-it').addEventListener('click', ()=>{
-    if(context==='wrong') next();
+    if(context==='wrong') advance();
     else { ex.hidden = true; $('ask').hidden = false; mode = 'ask'; }
   });
   ex.scrollIntoView({behavior: reduceMotion() ? 'auto' : 'smooth', block:'nearest'});
 }
 function learn(n){
-  if(mode==='wrong' || busy) return;
+  if(mode==='wrong' || mode==='end' || busy) return;
   if(!S.gems.includes(n) && !S.scorched.includes(n)) return;
   showExplain(n, 'learn');
 }
@@ -559,7 +608,8 @@ function renderReset(confirming){
   } else {
     row.innerHTML = '<p>Empty the hoard and start again?</p><button class="btn ghost" id="reset-yes" type="button">Yes, start again</button><button class="btn ghost" id="reset-no" type="button">Keep my gems</button>';
     $('reset-yes').addEventListener('click', ()=>{
-      S.gems = []; S.scorched = []; S.best = 0; streak = 0; missQ = []; save();
+      S.gems = []; S.scorched = []; S.best = 0; S.rounds = 0; streak = 0; missQ = []; save();
+      R = { q:0, right:0, newGems:[], missed:[] }; $('round-end').hidden = true; renderProgress();
       renderHoard(); renderStats(); renderReset(false); next();
     });
     $('reset-no').addEventListener('click', ()=>renderReset(false));
@@ -569,12 +619,13 @@ function renderReset(confirming){
 /* ---------- boot ---------- */
 function start(data){
   load();
-  if(data && data.current){ streak = data.streak||0; turn = data.turn||0; missQ = data.missQ||[]; }
+  if(data && data.current){ streak = data.streak||0; turn = data.turn||0; missQ = data.missQ||[]; if(data.R) R = data.R; }
+  renderProgress();
   $('name-input').value = S.name || '';
   renderSound(); renderHoard(); renderStats(); renderReset(false);
   ask(data && data.current ? data.current : pick());
 }
-window.claude?.hot?.snapshot?.(()=>({streak, turn, missQ, current}));
+window.claude?.hot?.snapshot?.(()=>({streak, turn, missQ, current, R}));
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
 </script>
