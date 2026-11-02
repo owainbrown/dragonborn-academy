@@ -1,0 +1,108 @@
+/* Shared look for the quest board games: torchlit stone, same tokens as Prime Hoard. Single dark theme by design. */
+:root{
+  color-scheme: dark;
+  --stone:#17161f; --stone-2:#211f2c; --stone-3:#2c2939; --line:#3f3a52;
+  --ink:#f1eadf; --ink-dim:#aaa2b8;
+  --scale:#c8321e; --scale-dark:#8e1f12; --bone:#e9dcc0;
+  --ember:#ff6b2c; --flame:#ffb347; --gold:#f5c451;
+  --good:#6fd39a; --miss:#ff8a7a; --char:#0d0c12; --frost:#7fd0ff;
+  --display:"Almendra","Palatino Linotype",Georgia,serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+html{height:100%;background:var(--stone)}
+body{
+  font-family:var(--body);font-size:17px;line-height:1.5;color:var(--ink);
+  background:radial-gradient(120% 55% at 15% 105%,rgba(255,107,44,.14),transparent 60%),var(--stone);
+  padding-inline:16px;padding-block:16px 40px;min-height:100%;
+}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+a{color:var(--flame)}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.wrap{max-width:1120px;margin-inline:auto;display:flex;flex-direction:column;gap:18px}
+.wrap.narrow{max-width:760px}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.back{display:inline-block;margin-bottom:6px;font-size:.95rem;font-weight:700;color:var(--ink-dim);text-decoration:none}
+.back:hover{color:var(--flame)}
+.brand h1{font-family:var(--display);font-weight:700;font-size:clamp(2rem,5vw,2.8rem);line-height:1;margin:0;color:var(--flame);letter-spacing:.01em;text-wrap:balance}
+.brand p{margin:6px 0 0;color:var(--ink-dim)}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;align-items:center;min-width:76px;padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--stone-2)}
+.stat .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-dim)}
+.stat .v{font-weight:700;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.stat.gold .v{color:var(--gold)}
+.stat.hot .v{color:var(--flame)}
+.bump{animation:bump .4s ease}
+@keyframes bump{40%{transform:scale(1.25)}}
+
+.panel{background:var(--stone-2);border:1px solid var(--line);border-radius:16px;padding:20px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.panel h2{font-family:var(--display);font-size:1.5rem;margin:0;color:var(--bone)}
+.flavour{margin:0;color:var(--ink-dim);font-style:italic;min-height:1.5em}
+
+.progress{display:flex;align-items:center;gap:12px}
+.progress span{font-weight:700;font-size:.95rem;color:var(--bone);white-space:nowrap;font-variant-numeric:tabular-nums}
+.bar{flex:1;height:10px;border-radius:99px;background:var(--stone);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ember),var(--flame));transition:width .4s}
+
+.tablet{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  min-height:140px;border-radius:18px;border:2px solid var(--line);padding:16px;text-align:center;
+  background:linear-gradient(160deg,var(--stone-3),#242131);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.04),inset 0 -12px 30px rgba(0,0,0,.35);
+  transition:border-color .3s,box-shadow .3s;
+}
+.tablet.good{border-color:var(--gold);box-shadow:0 0 0 4px rgba(245,196,81,.2),0 0 36px rgba(245,196,81,.35),inset 0 -12px 30px rgba(0,0,0,.35)}
+.tablet.wrong{border-color:var(--miss);animation:wobble .4s}
+@keyframes wobble{25%{transform:rotate(-1.5deg)}75%{transform:rotate(1.5deg)}}
+@keyframes shake{20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+
+.feedback{margin:0;min-height:1.6em;text-align:center;font-weight:700}
+.feedback.good{color:var(--good)}
+.feedback.bad{color:var(--miss)}
+
+.btn{min-height:52px;border-radius:12px;border:2px solid var(--gold);background:var(--gold);color:var(--char);font-weight:700;font-size:1.1rem;cursor:pointer;padding:8px 18px}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line);min-height:40px;font-size:.95rem}
+.btn.ghost[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.seg{display:inline-flex;gap:6px;flex-wrap:wrap}
+
+.explain{border:2px solid var(--miss);border-radius:14px;background:var(--stone-3);padding:18px;display:flex;flex-direction:column;gap:12px}
+.explain.learn{border-color:var(--gold)}
+.explain h3{margin:0;font-family:var(--display);font-size:1.4rem;color:var(--miss);text-wrap:balance}
+.explain.learn h3{color:var(--gold)}
+.explain p{margin:0}
+
+.round-end{border:2px solid var(--gold);border-radius:14px;background:var(--stone-3);padding:20px;display:flex;flex-direction:column;gap:14px;text-align:center;align-items:center}
+.round-end h3{margin:0;font-family:var(--display);font-size:1.7rem;color:var(--gold)}
+.round-end .score{font-size:3rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.round-end .score small{font-size:1.2rem;color:var(--ink-dim)}
+.round-end p{margin:0}
+.round-end h4{margin:0 0 6px;font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-dim)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.chip{min-width:2.4em;padding:4px 10px;border-radius:8px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--stone);border:1px solid var(--line);text-align:center}
+.chip.gold{background:var(--gold);color:var(--char);border-color:var(--gold)}
+.chip.practise{border-color:var(--miss);color:var(--miss)}
+
+.spellbook{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:rgba(0,0,0,.18)}
+.spellbook h3{margin:0 0 4px;font-family:var(--display);font-size:1.1rem;color:var(--bone)}
+.spellbook p{margin:4px 0 0;font-size:.95rem;color:var(--ink-dim)}
+.spellbook strong{color:var(--ink)}
+
+.hero-mini{width:64px;flex:0 0 auto}
+.hero-mini svg{width:100%;height:auto;display:block;overflow:visible}
+.hero-mini .mouth-glow{opacity:0;transition:opacity .15s}
+.hero-mini.breathing .mouth-glow{opacity:1}
+
+/* stacked fractions */
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;margin:0 .12em;font-variant-numeric:tabular-nums}
+.frac>span:first-child{border-bottom:.08em solid currentColor;padding:0 .15em}
+.frac>span:last-child{padding:0 .15em}
+.mixed{display:inline-flex;align-items:center;gap:.08em}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

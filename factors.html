@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#17161f">
+<title>Factor Forge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Almendra:wght@400;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kit.css">
+<style>
+/* Layout: the forge (number on an anvil, timer) above a factor rainbow, then a big keypad. Two columns on wide screens. */
+.board{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:880px){.board{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start}}
+.forge{display:flex;align-items:center;gap:14px}
+.forge .tablet{flex:1;min-width:0}
+.num{font-weight:700;font-size:clamp(4rem,14vw,6.5rem);line-height:1;font-variant-numeric:tabular-nums}
+.timer{font-weight:700;font-size:1.1rem;color:var(--flame);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.timer.low{color:var(--miss);animation:shake .5s infinite}
+.timer.off{color:var(--ink-dim)}
+.cooling{position:absolute;left:0;right:0;bottom:0;height:6px;border-radius:0 0 16px 16px;background:linear-gradient(90deg,var(--ember),var(--flame));transform-origin:left;transition:transform .25s linear}
+
+/* factor rainbow */
+.rainbow{display:flex;flex-direction:column;align-items:stretch;gap:0}
+.rainbow svg{width:100%;height:64px;display:block;overflow:visible}
+.rb-row{display:flex;justify-content:space-between;gap:4px}
+.rb{flex:1 1 0;min-width:0;max-width:52px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;border:2px dashed var(--line);color:var(--ink-dim);font-weight:700;font-size:clamp(.85rem,3.2vw,1.15rem);font-variant-numeric:tabular-nums;background:var(--stone)}
+.rb.on{border-style:solid;border-color:var(--c);color:var(--char);background:var(--c)}
+.rb.missed{border-style:solid;border-color:var(--miss);color:var(--miss);background:transparent}
+.rb.pop{animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.rb-cap{margin:6px 0 0;text-align:center;color:var(--ink-dim);font-size:.92rem}
+
+/* keypad */
+.entry{display:flex;align-items:center;justify-content:center;gap:10px}
+.screen{min-width:5ch;padding:6px 14px;border-radius:12px;border:2px solid var(--line);background:var(--char);font-weight:700;font-size:2rem;line-height:1.2;text-align:center;font-variant-numeric:tabular-nums;color:var(--gold);min-height:1.2em}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.key{min-height:60px;border-radius:14px;border:2px solid var(--line);background:var(--stone-3);font-weight:700;font-size:1.5rem;cursor:pointer;font-variant-numeric:tabular-nums}
+.key:active{transform:scale(.96)}
+.key.strike{background:var(--gold);border-color:var(--gold);color:var(--char);font-family:var(--display);font-size:1.3rem}
+.key.del{font-size:1.1rem;color:var(--ink-dim)}
+.key:disabled{opacity:.45;cursor:default}
+.side{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.pairs{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.pairs li{padding:4px 10px;border-radius:8px;background:var(--stone);border:1px solid var(--line);font-weight:700;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <a class="back" href="./">← Quest board</a>
+      <h1>Factor Forge</h1>
+      <p>Forge every factor before the fire cools.</p>
+    </div>
+    <div class="stats">
+      <div class="stat gold"><span class="k">Found</span><span class="v" id="found">0</span></div>
+      <div class="stat hot"><span class="k">Best round</span><span class="v" id="best">–</span></div>
+    </div>
+  </header>
+
+  <main class="board">
+    <section class="panel" aria-label="The forge">
+      <div class="progress"><span id="round-label">Number 1 of 5</span><div class="bar" aria-hidden="true"><i id="round-bar"></i></div></div>
+      <div class="forge">
+        <div class="hero-mini" id="hero"></div>
+        <div class="tablet" id="tablet">
+          <span class="num" id="num">–</span>
+          <span class="timer" id="timer">1:00</span>
+          <span class="cooling" id="cooling"></span>
+        </div>
+      </div>
+      <div class="rainbow" id="rainbow" aria-live="polite"></div>
+      <p class="feedback" id="feedback" aria-live="polite"></p>
+      <div class="explain learn" id="summary" hidden aria-live="polite"></div>
+      <div class="round-end" id="round-end" hidden aria-live="polite"></div>
+    </section>
+
+    <section class="side">
+      <div class="panel" id="pad-panel">
+        <div class="entry"><span class="sr">Your factor:</span><span class="screen" id="screen" aria-live="polite"></span></div>
+        <div class="pad" id="pad"></div>
+        <button class="btn ghost" id="reveal" type="button">I'm stuck, show me the rest</button>
+      </div>
+      <div class="spellbook">
+        <h3>Spellbook</h3>
+        <p><strong>A factor</strong> divides exactly into a number, with nothing left over.</p>
+        <p><strong>Work in pairs:</strong> start with 1 × the number, then try 2, 3, 4 and so on. Each factor you find brings its partner with it. When the pairs meet in the middle, you have them all.</p>
+        <p><strong>Times tables help:</strong> 6 × 4 = 24, so 6 and 4 are both factors of 24.</p>
+      </div>
+      <div class="row">
+        <div class="seg" role="group" aria-label="Mode">
+          <button class="btn ghost" id="mode-timed" type="button">Timed: 1 minute</button>
+          <button class="btn ghost" id="mode-relaxed" type="button">Relaxed</button>
+        </div>
+        <button class="btn ghost" id="sound-btn" type="button">Sound: on</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="assets/maths.js"></script>
+<script src="assets/kit.js"></script>
+<script>
+(function(){
+const { $ } = Kit, M = Maths;
+const KEY = 'factor-forge-v1', ROUND = 5, TIME = 60;
+const COLS = ['#f5c451', '#ff8a5b', '#ff6f96', '#c98bff', '#7fa6ff', '#5fd4c4', '#6fe08f'];
+let S = Kit.load(KEY, { rounds: 0, best: 0, timed: true });
+let R, cur = null, entry = '', recent = [], ticker = null;
+
+$('hero').innerHTML = Kit.heroSVG;
+Kit.soundButton($('sound-btn'));
+
+/* ---------- rainbow ---------- */
+function drawRainbow(el, n, found, done){
+  const fs = M.factors(n), len = fs.length, col = i => COLS[Math.min(i, len - 1 - i) % COLS.length];
+  el.innerHTML = `<svg aria-hidden="true"></svg><div class="rb-row">${fs.map((f, i) => {
+    const on = found.has(f), cls = on ? 'on' : done ? 'missed' : '';
+    return `<span class="rb ${cls}" data-f="${f}" style="--c:${col(i)}" aria-label="${on || done ? f : 'hidden factor'}">${on || done ? f : '?'}</span>`;
+  }).join('')}</div><p class="rb-cap">${found.size} of ${len} factors${done ? '' : ' found'}</p>`;
+  requestAnimationFrame(() => {
+    const svg = el.querySelector('svg'), row = el.querySelector('.rb-row');
+    if(!svg || !row) return;
+    const box = row.getBoundingClientRect(), chips = [...row.children], H = 64;
+    const xs = chips.map(c => { const r = c.getBoundingClientRect(); return r.left - box.left + r.width / 2; });
+    const maxSpan = (xs[len - 1] - xs[0]) || 1;
+    svg.setAttribute('viewBox', `0 0 ${box.width} ${H}`);
+    let paths = '';
+    for(let i = 0; i < Math.floor(len / 2); i++){
+      const j = len - 1 - i, show = found.has(fs[i]) && found.has(fs[j]);
+      if(!show) continue;
+      const rx = (xs[j] - xs[i]) / 2, ry = Math.max(6, (H - 4) * (xs[j] - xs[i]) / maxSpan);
+      paths += `<path d="M${xs[i]} ${H} A${rx} ${ry} 0 0 1 ${xs[j]} ${H}" fill="none" stroke="${col(i)}" stroke-width="3" stroke-linecap="round"/>`;
+    }
+    svg.innerHTML = paths;
+  });
+}
+addEventListener('resize', () => { if(cur) drawRainbow($('rainbow'), cur.n, cur.found, cur.done); });
+
+/* ---------- flow ---------- */
+function renderMode(){
+  $('mode-timed').setAttribute('aria-pressed', String(S.timed));
+  $('mode-relaxed').setAttribute('aria-pressed', String(!S.timed));
+}
+function renderProgress(){
+  const i = Math.max(1, Math.min(R.i + (cur && cur.done ? 0 : 1), ROUND));
+  $('round-label').textContent = `Number ${i} of ${ROUND}`;
+  $('round-bar').style.width = (R.i / ROUND * 100) + '%';
+  $('found').textContent = R.found;
+  $('best').textContent = S.rounds ? S.best + '%' : '–';
+}
+function newRound(){
+  R = { i: 0, found: 0, total: 0, log: [] };
+  $('round-end').hidden = true; $('pad-panel').hidden = false;
+  start();
+}
+function start(){
+  const n = M.pickFactorNumber(recent); recent.push(n); if(recent.length > 8) recent.shift();
+  cur = { n, found: new Set(), wrong: 0, left: TIME, done: false, started: performance.now() };
+  entry = ''; renderEntry();
+  $('num').textContent = n;
+  $('tablet').className = 'tablet';
+  $('summary').hidden = true; $('reveal').hidden = false;
+  $('feedback').textContent = S.timed ? 'Type a factor and strike!' : 'Take your time. Type a factor and strike!';
+  $('feedback').className = 'feedback';
+  setPad(true);
+  drawRainbow($('rainbow'), n, cur.found, false);
+  renderProgress();
+  clearInterval(ticker);
+  renderTimer();
+  if(S.timed) ticker = setInterval(tick, 250);
+}
+function tick(){
+  if(!cur || cur.done) return;
+  const prev = Math.ceil(cur.left);
+  cur.left = Math.max(0, TIME - (performance.now() - cur.started) / 1000);
+  if(Math.ceil(cur.left) !== prev && cur.left <= 10 && cur.left > 0) Kit.sfx('tick');
+  renderTimer();
+  if(cur.left <= 0) finish('time');
+}
+function renderTimer(){
+  const t = $('timer');
+  if(!S.timed){ t.textContent = 'No timer'; t.className = 'timer off'; $('cooling').style.transform = 'scaleX(1)'; return; }
+  const s = Math.ceil(cur.left);
+  t.textContent = `0:${String(s).padStart(2, '0')}`.replace('0:60', '1:00');
+  t.className = 'timer' + (s <= 10 ? ' low' : '');
+  $('cooling').style.transform = `scaleX(${cur.left / TIME})`;
+}
+function setPad(on){ [...$('pad').children].forEach(b => b.disabled = !on); }
+function renderEntry(){ $('screen').textContent = entry; }
+
+function strike(){
+  if(!cur || cur.done || !entry) return;
+  const v = +entry, n = cur.n; entry = ''; renderEntry();
+  const fb = $('feedback');
+  if(v === 0){ fb.textContent = 'Nothing divides by zero, not even a dragon.'; fb.className = 'feedback bad'; return; }
+  if(v > n){ fb.textContent = `A factor of ${n} can't be bigger than ${n}.`; fb.className = 'feedback bad'; Kit.sfx('miss'); return; }
+  if(n % v === 0){
+    const p = n / v;
+    if(cur.found.has(v)){ fb.textContent = `${v} is already on the anvil.`; fb.className = 'feedback'; return; }
+    cur.found.add(v); cur.found.add(p);
+    Kit.breathe($('hero')); Kit.sfx('gem');
+    fb.textContent = v === p ? `${v} × ${v} = ${n}. A square number: ${v} pairs with itself!` : `${v} × ${p} = ${n}. ${v} brought its partner ${p}!`;
+    fb.className = 'feedback good';
+    $('tablet').className = 'tablet good';
+    setTimeout(() => { if(cur && !cur.done) $('tablet').className = 'tablet'; }, 400);
+    drawRainbow($('rainbow'), n, cur.found, false);
+    [...$('rainbow').querySelectorAll('.rb')].filter(c => +c.dataset.f === v || +c.dataset.f === p).forEach(c => c.classList.add('pop'));
+    Kit.bump($('found')); $('found').textContent = R.found + cur.found.size;
+    if(cur.found.size === M.factors(n).length) finish('all');
+  } else {
+    cur.wrong++;
+    Kit.sfx('miss');
+    $('tablet').className = 'tablet wrong';
+    setTimeout(() => { if(cur && !cur.done) $('tablet').className = 'tablet'; }, 400);
+    fb.textContent = `${n} ÷ ${v} = ${Math.floor(n / v)} r ${n % v}. Not exact, so ${v} isn't a factor.`;
+    fb.className = 'feedback bad';
+  }
+}
+
+function finish(why){
+  if(cur.done) return;
+  cur.done = true; clearInterval(ticker); setPad(false);
+  const n = cur.n, fs = M.factors(n), got = cur.found.size, all = got === fs.length;
+  R.i++; R.found += got; R.total += fs.length; R.log.push({ n, got, of: fs.length });
+  drawRainbow($('rainbow'), n, cur.found, true);
+  if(all) Kit.sfx('win');
+  const secs = Math.round((performance.now() - cur.started) / 1000);
+  const missed = fs.filter(f => !cur.found.has(f));
+  const prime = M.isPrime(n);
+  const title = all ? (prime ? `${n} is prime!` : `Every factor of ${n} forged!`) : why === 'time' ? 'The forge has cooled.' : `Here are the rest for ${n}.`;
+  const lead = all
+    ? (prime ? `Only 1 × ${n}. You know this one from the Prime Hoard.` : `All ${fs.length} factors${S.timed ? ` in ${secs} seconds` : ''}.`)
+    : `You found ${got} of ${fs.length}. The ones in red were still hiding: ${M.listAnd(missed.map(String))}.`;
+  const pairs = M.factorPairs(n).map(([a, b]) => `<li>${a} × ${b}</li>`).join('');
+  const s = $('summary');
+  s.innerHTML = `<h3>${title}</h3><p>${lead}</p><p>The factor pairs of ${n}:</p><ul class="pairs">${pairs}</ul>
+    <button class="btn" id="next" type="button">${R.i >= ROUND ? 'See the round' : 'Next number'}</button>`;
+  s.hidden = false; $('reveal').hidden = true;
+  $('feedback').textContent = '';
+  renderProgress();
+  $('next').addEventListener('click', () => R.i >= ROUND ? roundEnd() : start());
+  Kit.scrollTo(s);
+}
+
+function roundEnd(){
+  const pct = Math.round(R.found / R.total * 100);
+  S.rounds++; if(pct > S.best) S.best = pct; Kit.save(KEY, S);
+  const verdict = pct === 100 ? 'Master smith! Not a single factor escaped.' : pct >= 80 ? 'Mighty forging!' : pct >= 60 ? 'Good work, hero. The pairs are getting quicker.' : 'Every smith starts somewhere. Try working in pairs from 1 upwards.';
+  const el = $('round-end');
+  el.innerHTML = `<h3>Round ${S.rounds} complete!</h3>
+    <div class="score">${pct}%<small> of factors found</small></div>
+    <p>${verdict}</p>
+    <div><h4>This round</h4><div class="chips">${R.log.map(l => `<span class="chip ${l.got === l.of ? 'gold' : 'practise'}">${l.n}: ${l.got}/${l.of}</span>`).join('')}</div></div>
+    <button class="btn" id="again" type="button">Forge again</button>`;
+  el.hidden = false; $('summary').hidden = true; $('pad-panel').hidden = true;
+  renderProgress(); $('round-bar').style.width = '100%';
+  $('again').addEventListener('click', newRound);
+  Kit.scrollTo(el);
+}
+
+/* ---------- controls ---------- */
+const keys = ['1','2','3','4','5','6','7','8','9','del','0','strike'];
+$('pad').innerHTML = keys.map(k => k === 'del' ? '<button class="key del" type="button" data-k="del" aria-label="Delete">Delete</button>'
+  : k === 'strike' ? '<button class="key strike" type="button" data-k="strike">Strike!</button>'
+  : `<button class="key" type="button" data-k="${k}">${k}</button>`).join('');
+const press = k => {
+  if(!cur || cur.done) return;
+  if(k === 'del') entry = entry.slice(0, -1);
+  else if(k === 'strike') return strike();
+  else if(entry.length < 3) entry = (entry + k).replace(/^0+(?=\d)/, '');
+  renderEntry();
+};
+$('pad').addEventListener('click', e => { const b = e.target.closest('.key'); if(b) press(b.dataset.k); });
+addEventListener('keydown', e => {
+  if(/^\d$/.test(e.key)) press(e.key);
+  else if(e.key === 'Backspace') press('del');
+  else if(e.key === 'Enter'){ e.preventDefault(); if(cur && !cur.done) press('strike'); else { const b = $('next') || $('again'); if(b && b.offsetParent) b.click(); } }
+});
+$('reveal').addEventListener('click', () => { if(cur && !cur.done) finish('reveal'); });
+const setMode = timed => { S.timed = timed; Kit.save(KEY, S); renderMode(); if(cur && !cur.done){ cur.started = performance.now(); cur.left = TIME; clearInterval(ticker); renderTimer(); if(timed) ticker = setInterval(tick, 250); } };
+$('mode-timed').addEventListener('click', () => setMode(true));
+$('mode-relaxed').addEventListener('click', () => setMode(false));
+
+renderMode();
+newRound();
+})();
+</script>
+</body>
+</html>
