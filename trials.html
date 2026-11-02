@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#17161f">
+<title>Quest Trials</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Almendra:wght@400;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kit.css">
+<style>
+/* Layout: hero faces a foe with a health bar; each right answer lands a hit. Question tablet, four answer runes, explanation on a miss. */
+.arena{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px}
+.arena .hero-mini{width:72px}
+.foe{display:flex;flex-direction:column;align-items:center;gap:4px;width:84px;text-align:center}
+.foe .sigil{font-family:var(--display);font-size:2.6rem;line-height:1;color:var(--foe);transition:transform .2s,opacity .4s}
+.foe.hit .sigil{animation:shake .4s}
+.foe.down .sigil{opacity:.25;transform:rotate(-12deg) scale(.85)}
+.foe .name{font-family:var(--display);font-size:.95rem;color:var(--bone);line-height:1.15}
+.hp{display:flex;flex-direction:column;gap:4px}
+.hp .lbl{display:flex;justify-content:space-between;font-size:.82rem;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.hp .bar{flex:none}
+.hp .bar i{background:linear-gradient(90deg,var(--scale-dark),var(--scale))}
+.hp .bar.mine i{background:linear-gradient(90deg,var(--ember),var(--flame))}
+.prompt{font-size:1.2rem;line-height:1.55;text-wrap:balance}
+.prompt .expr{display:inline-block;margin-top:6px;font-size:clamp(1.6rem,6vw,2.2rem);letter-spacing:.02em;color:var(--gold)}
+.prompt u{text-decoration-color:var(--flame);text-decoration-thickness:3px;text-underline-offset:5px;color:var(--flame)}
+.tablet .frac{font-size:1.05em}
+.answers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ans{min-height:68px;border-radius:14px;border:2px solid var(--line);background:var(--stone-3);font-weight:700;font-size:clamp(1.05rem,3.6vw,1.3rem);cursor:pointer;padding:8px 10px;font-variant-numeric:tabular-nums;line-height:1.25}
+.ans:hover:not(:disabled){border-color:var(--flame)}
+.ans:active:not(:disabled){transform:scale(.97)}
+.ans:disabled{cursor:default}
+.ans.right{background:var(--good);border-color:var(--good);color:var(--char)}
+.ans.wrong{border-color:var(--miss);color:var(--miss);text-decoration:line-through}
+.ans.dim{opacity:.4}
+.explain .tipline{color:var(--ink-dim);font-size:.95rem}
+.unknown{text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+</style>
+</head>
+<body>
+<div class="wrap narrow">
+  <header class="top">
+    <div class="brand">
+      <a class="back" href="./">← Quest board</a>
+      <h1 id="title">Quest Trials</h1>
+      <p id="blurb"></p>
+    </div>
+    <div class="stats">
+      <div class="stat hot"><span class="k">Streak</span><span class="v" id="streak">0</span></div>
+      <div class="stat gold"><span class="k">Best</span><span class="v" id="best">–</span></div>
+    </div>
+  </header>
+
+  <section class="panel" id="game" aria-label="Encounter">
+    <div class="arena">
+      <div class="hero-mini" id="hero"></div>
+      <div class="hp">
+        <div class="lbl"><span id="foe-hp-label">HP 10/10</span><span id="q-label">Q1 of 10</span></div>
+        <div class="bar" aria-hidden="true"><i id="foe-bar" style="width:100%"></i></div>
+      </div>
+      <div class="foe" id="foe"><span class="sigil" id="sigil">?</span><span class="name" id="foe-name"></span></div>
+    </div>
+    <p class="flavour" id="flavour"></p>
+    <div class="tablet" id="tablet"><div class="prompt" id="prompt" aria-live="polite"></div></div>
+    <div class="answers" id="answers"></div>
+    <p class="feedback" id="feedback" aria-live="polite"></p>
+    <div class="explain" id="explain" hidden aria-live="polite"></div>
+    <div class="round-end" id="round-end" hidden aria-live="polite"></div>
+  </section>
+
+  <div class="spellbook" id="spellbook"></div>
+  <div class="unknown" id="unknown" hidden><p>That quest isn't on the board.</p><a class="btn" href="./">Back to the quest board</a></div>
+  <div style="display:flex;justify-content:flex-end"><button class="btn ghost" id="sound-btn" type="button">Sound: on</button></div>
+</div>
+
+<script src="assets/maths.js"></script>
+<script src="assets/kit.js"></script>
+<script>
+(function(){
+const { $ } = Kit, M = Maths;
+const KEY = 'trials-v1', ROUND = 10;
+const quest = new URLSearchParams(location.search).get('quest');
+const Q = M.QUESTS[quest];
+Kit.soundButton($('sound-btn'));
+if(!Q){ $('game').hidden = true; $('spellbook').hidden = true; $('unknown').hidden = false; return; }
+
+const FOES = {
+  vault:   { name: 'The Vault Mimic',  sigil: '#',  colour: 'var(--gold)',  flavour: ['The mimic\'s lid creaks open.', 'Coins clatter across the vault floor.', 'A ledger glows with impossible numbers.', 'Frost creeps up the cavern walls.'] },
+  spells:  { name: 'The Rune Golem',   sigil: '( )', colour: 'var(--frost)', flavour: ['Runes flare across the golem\'s chest.', 'The golem raises a stone fist.', 'A spell must be cast in the right order.', 'The forge roars behind you.'] },
+  potions: { name: 'The Hag\'s Cauldron', sigil: '½', colour: 'var(--good)', flavour: ['Green smoke curls from the cauldron.', 'Bottles rattle on the shelf.', 'The recipe is written in fractions.', 'Something bubbles ominously.'] }
+};
+const SPELLBOOK = {
+  vault: `<h3>Spellbook</h3>
+    <p><strong>Place value:</strong> split big numbers into blocks of three from the right: millions, thousands, ones. 3,040,506 is 3 million, 40 thousand and 506.</p>
+    <p><strong>Rounding:</strong> look at the digit one place to the right of where you're rounding. 5 or more rounds up; 4 or less rounds down.</p>
+    <p><strong>Negative numbers:</strong> use a number line and count through zero. ${M.MINUS}15 is colder than ${M.MINUS}5.</p>`,
+  spells: `<h3>Spellbook</h3>
+    <p><strong>BIDMAS:</strong> Brackets, Indices, Division and Multiplication, then Addition and Subtraction.</p>
+    <p><strong>Long multiplication:</strong> multiply by the ones, then by the tens with a placeholder zero, then add the two rows.</p>
+    <p><strong>Remainders:</strong> the remainder is always smaller than the number you're dividing by.</p>`,
+  potions: `<h3>Spellbook</h3>
+    <p><strong>Simplify:</strong> divide the top and bottom by their greatest common factor, the crown jewel from Shared Hoard.</p>
+    <p><strong>Add and subtract:</strong> make the denominators the same first, then add or subtract the numerators only.</p>
+    <p><strong>Fraction of an amount:</strong> divide by the bottom, multiply by the top.</p>`
+};
+const foe = FOES[quest];
+document.title = Q.title;
+$('title').textContent = Q.title;
+$('blurb').textContent = Q.blurb;
+$('spellbook').innerHTML = SPELLBOOK[quest];
+$('hero').innerHTML = Kit.heroSVG;
+$('foe-name').textContent = foe.name;
+$('sigil').textContent = foe.sigil;
+$('foe').style.setProperty('--foe', foe.colour);
+
+const all = Kit.load(KEY, {});
+const S = all[quest] = Object.assign({ rounds: 0, best: 0, weak: {} }, all[quest]);
+const save = () => Kit.save(KEY, all);
+const render = s => quest === 'potions' ? Kit.math(s) : s;
+let R, cur = null, streak = 0, busy = false, lastKind = null;
+
+function renderStats(){
+  $('streak').textContent = streak;
+  $('best').textContent = S.rounds ? `${S.best}/${ROUND}` : '–';
+  $('q-label').textContent = `Q${Math.max(1, Math.min(R.q + (busy ? 0 : 1), ROUND))} of ${ROUND}`;
+  $('foe-hp-label').textContent = `HP ${ROUND - R.right}/${ROUND}`;
+  $('foe-bar').style.width = ((ROUND - R.right) / ROUND * 100) + '%';
+}
+function newRound(){
+  R = { q: 0, right: 0, missedKinds: {} };
+  $('round-end').hidden = true; $('foe').classList.remove('down');
+  next();
+}
+function next(){
+  cur = M.makeQuestion(quest, S.weak, lastKind); lastKind = cur.kind; busy = false;
+  $('flavour').textContent = M.pick(foe.flavour);
+  $('prompt').innerHTML = render(cur.prompt);
+  $('tablet').className = 'tablet';
+  $('answers').innerHTML = cur.choices.map((c, i) => `<button class="ans" type="button" data-i="${i}">${render(Kit.esc(c))}</button>`).join('');
+  $('answers').hidden = false; $('explain').hidden = true;
+  $('feedback').textContent = ''; $('feedback').className = 'feedback';
+  renderStats();
+}
+function choose(i){
+  if(busy || !cur) return;
+  busy = true;
+  const right = i === cur.answer, btns = [...$('answers').children];
+  btns.forEach((b, j) => { b.disabled = true; if(j === cur.answer) b.classList.add('right'); else if(j === i) b.classList.add('wrong'); else b.classList.add('dim'); });
+  R.q++;
+  const label = Q.kinds[cur.kind][0];
+  if(right){
+    R.right++; streak++;
+    S.weak[cur.kind] = Math.max(0, (S.weak[cur.kind] || 0) - 0.5);
+    Kit.breathe($('hero')); Kit.sfx('fire'); setTimeout(() => Kit.sfx('gem'), 250);
+    const f = $('foe'); f.classList.remove('hit'); void f.offsetWidth; f.classList.add('hit');
+    $('tablet').className = 'tablet good';
+    $('feedback').textContent = M.pick([`${Kit.heroName()} lands a hit!`, 'A direct hit!', 'Right on target!', `${label}: mastered.`, 'The foe staggers!']);
+    $('feedback').className = 'feedback good';
+    save(); renderStats(); Kit.bump($('streak'));
+    setTimeout(advance, Kit.reduceMotion() ? 1100 : 1500);
+  } else {
+    streak = 0;
+    S.weak[cur.kind] = Math.min(3, (S.weak[cur.kind] || 0) + 1);
+    R.missedKinds[cur.kind] = (R.missedKinds[cur.kind] || 0) + 1;
+    Kit.sfx('miss');
+    $('tablet').className = 'tablet wrong';
+    save(); renderStats();
+    const ex = $('explain');
+    ex.className = 'explain';
+    ex.innerHTML = `<h3>Not quite. The answer is ${render(Kit.esc(cur.choices[cur.answer]))}.</h3>
+      <p>${render(cur.explain)}</p>
+      <p class="tipline">${label} will come up a bit more often until it sticks.</p>
+      <button class="btn" id="got-it" type="button">Got it, next!</button>`;
+    ex.hidden = false;
+    $('got-it').addEventListener('click', advance);
+    Kit.scrollTo(ex);
+  }
+}
+function advance(){ if(R.q >= ROUND) roundEnd(); else next(); }
+
+function roundEnd(){
+  S.rounds++; if(R.right > S.best) S.best = R.right; save();
+  const won = R.right >= 7;
+  if(won){ $('foe').classList.add('down'); Kit.sfx('win'); }
+  const verdict = R.right === ROUND ? `A flawless victory! ${foe.name} is defeated.` : won ? `${foe.name} is defeated!` : R.right >= 5 ? `${foe.name} retreats, wounded. One more try?` : `${foe.name} holds its ground. Read the spellbook, then try again.`;
+  const practise = Object.keys(R.missedKinds).map(k => `<span class="chip practise">${Q.kinds[k][0]}</span>`).join('');
+  const el = $('round-end');
+  el.innerHTML = `<h3>Round ${S.rounds} complete!</h3>
+    <div class="score">${R.right}<small> out of ${ROUND}</small></div>
+    <p>${verdict}</p>
+    ${practise ? `<div><h4>To practise</h4><div class="chips">${practise}</div></div>` : ''}
+    <button class="btn" id="again" type="button">Fight again</button>`;
+  el.hidden = false; $('answers').hidden = true; $('explain').hidden = true;
+  $('prompt').innerHTML = ''; $('feedback').textContent = ''; $('flavour').textContent = '';
+  renderStats(); $('q-label').textContent = 'Done';
+  $('again').addEventListener('click', newRound);
+  Kit.scrollTo(el);
+}
+
+$('answers').addEventListener('click', e => { const b = e.target.closest('.ans'); if(b) choose(+b.dataset.i); });
+addEventListener('keydown', e => {
+  if(/^[1-4]$/.test(e.key) && !$('answers').hidden) choose(+e.key - 1);
+  else if(e.key === 'Enter'){ const b = [$('got-it'), $('again')].find(x => x && x.offsetParent); if(b){ e.preventDefault(); b.click(); } }
+});
+newRound();
+})();
+</script>
+</body>
+</html>

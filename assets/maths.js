@@ -272,7 +272,7 @@ const POTIONS = {
     return { kind:'addSub', answer: ans, distractors: [naive, fstr(r + 1, L), fstr(add ? n1 * n2 : Math.max(1, r - 1), add ? d1 * d2 : L), `${n1 + n2}/${L}`],
       reject: s => sameVal(s, ans),
       prompt: `Mix the potions:<br><b class="expr">${n1}/${d1} ${add ? '+' : MINUS} ${n2}/${d2}</b>`,
-      explain: `The denominators must match first. The lowest common multiple of ${d1} and ${d2} is ${L}. ${n1}/${d1} = ${a}/${L} and ${n2}/${d2} = ${b}/${L}. Then ${a}/${L} ${add ? '+' : MINUS} ${b}/${L} = ${shown}${conv}${conv ? ' in its simplest form' : ''}.`,
+      explain: `The denominators must match first. The lowest common multiple of ${d1} and ${d2} is ${L}. ${[[n1, d1, a], [n2, d2, b]].filter(x => x[1] !== L).map(x => `${x[0]}/${x[1]} = ${x[2]}/${L}`).join(' and ')}. Then ${a}/${L} ${add ? '+' : MINUS} ${b}/${L} = ${shown}${conv}${conv ? ' in its simplest form' : ''}.`,
       fallback: () => fstr(randInt(1, 2 * L), L) };
   },
   mixedToImproper(){

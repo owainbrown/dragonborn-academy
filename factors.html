@@ -147,7 +147,7 @@ function renderMode(){
   $('mode-relaxed').setAttribute('aria-pressed', String(!S.timed));
 }
 function renderProgress(){
-  const i = Math.min(R.i + 1, ROUND);
+  const i = Math.max(1, Math.min(R.i + (cur && cur.done ? 0 : 1), ROUND));
   $('round-label').textContent = `Number ${i} of ${ROUND}`;
   $('round-bar').style.width = (R.i / ROUND * 100) + '%';
   $('found').textContent = R.found;
